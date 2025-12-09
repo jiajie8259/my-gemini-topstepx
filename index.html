@@ -1,551 +1,528 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  LineChart, Calculator, TrendingUp, DollarSign, Target, 
-  ArrowRight, Info, PlusCircle, MinusCircle, Lock, Unlock, 
-  Download, Trash2, Wallet, PieChart 
-} from 'lucide-react';
-
-// --- Helper: 格式化數值 (整數不顯示小數點) ---
-const formatNumber = (val) => {
-  if (val === null || val === '') return '--';
-  const num = parseFloat(val);
-  if (Number.isInteger(num)) return num.toString();
-  return num.toFixed(2);
-};
-
-// --- Helper: 格式化台幣 ---
-const formatTWD = (val) => {
-  if (!val) return '$0';
-  return new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(val);
-};
-
-// --- 元件：技術分析圖形卡片 (緊湊版) ---
-const PatternCard = ({ title, description, svgContent, inputs, resultLabel, resultValue }) => {
-  return (
-    <div className="bg-slate-800 rounded-lg border border-slate-700 p-3 shadow-lg flex flex-col h-full">
-      <div className="flex flex-col items-center justify-center bg-slate-900 rounded p-2 border border-slate-800 mb-3">
-        <h3 className="text-sm font-bold text-slate-200 mb-1">{title}</h3>
-        <div className="w-full h-20 flex items-center justify-center">
-          {svgContent}
-        </div>
-      </div>
-      <div className="flex-1 flex flex-col justify-between space-y-2">
-        <div className="space-y-2">
-          {inputs.map((input, idx) => (
-            <div key={idx} className="flex flex-col">
-              <label className="text-[10px] text-slate-400 mb-0.5">{input.label}</label>
-              <input
-                type="number"
-                value={input.value}
-                onChange={(e) => input.onChange(e.target.value)}
-                placeholder={input.placeholder}
-                className="w-full bg-slate-700 text-white text-sm border border-slate-600 rounded px-2 py-1 focus:outline-none focus:border-blue-500 transition-colors"
-              />
-            </div>
-          ))}
-        </div>
-        <div className="pt-2 border-t border-slate-700 mt-2">
-           <div className="flex flex-col items-center bg-blue-900/20 p-2 rounded border border-blue-500/20">
-             <span className="text-[10px] text-blue-300 font-medium mb-1">{resultLabel}</span>
-             <span className="text-lg font-bold text-white">{formatNumber(resultValue)}</span>
-           </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- 元件：加減碼計算器 ---
-const PositionManager = () => {
-  const [currentLots, setCurrentLots] = useState('');
-  const [currentCost, setCurrentCost] = useState('');
-  const [actionLots, setActionLots] = useState('');
-  const [actionPrice, setActionPrice] = useState('');
-  const [mode, setMode] = useState('add');
-  const [newAvgCost, setNewAvgCost] = useState(null);
-  const [realizedPnL, setRealizedPnL] = useState(null);
-  const POINT_VALUE = 2;
-
-  useEffect(() => {
-    if (!currentLots || !currentCost || !actionLots || !actionPrice) {
-      setNewAvgCost(null);
-      setRealizedPnL(null);
-      return;
-    }
-    const cLots = parseFloat(currentLots);
-    const cCost = parseFloat(currentCost);
-    const aLots = parseFloat(actionLots);
-    const aPrice = parseFloat(actionPrice);
-
-    if (mode === 'add') {
-      const totalCost = (cLots * cCost) + (aLots * aPrice);
-      const totalLots = cLots + aLots;
-      setNewAvgCost(totalCost / totalLots);
-      setRealizedPnL(null);
-    } else {
-      const diff = aPrice - cCost;
-      const pnl = diff * aLots * POINT_VALUE;
-      setRealizedPnL(pnl);
-      setNewAvgCost(cCost);
-    }
-  }, [currentLots, currentCost, actionLots, actionPrice, mode]);
-
-  return (
-    <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg relative overflow-hidden mt-6">
-       <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-          <TrendingUp size={100} />
-       </div>
-       <h3 className="text-lg font-bold text-white mb-4 flex items-center relative z-10">
-          <TrendingUp className="mr-2 text-orange-400" /> 
-          Step 2: 加/減碼 成本試算
-       </h3>
-       <div className="flex space-x-4 mb-4 relative z-10">
-         <button onClick={() => setMode('add')} className={`flex-1 py-2 px-4 rounded flex items-center justify-center transition-all ${mode === 'add' ? 'bg-orange-600 text-white' : 'bg-slate-700 text-slate-400'}`}>
-           <PlusCircle size={16} className="mr-2" /> 加碼
-         </button>
-         <button onClick={() => setMode('reduce')} className={`flex-1 py-2 px-4 rounded flex items-center justify-center transition-all ${mode === 'reduce' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-400'}`}>
-           <MinusCircle size={16} className="mr-2" /> 減碼
-         </button>
-       </div>
-       <div className="grid grid-cols-2 gap-4 relative z-10">
-          <div className="bg-slate-900/50 p-3 rounded border border-slate-700">
-            <h4 className="text-xs text-slate-500 mb-2 uppercase font-bold">目前持倉</h4>
-            <div className="space-y-2">
-              <input type="number" placeholder="目前口數" value={currentLots} onChange={e => setCurrentLots(e.target.value)} className="w-full bg-slate-800 border-slate-600 rounded px-2 py-1 text-white text-sm" />
-              <input type="number" placeholder="目前成本" value={currentCost} onChange={e => setCurrentCost(e.target.value)} className="w-full bg-slate-800 border-slate-600 rounded px-2 py-1 text-white text-sm" />
-            </div>
-          </div>
-          <div className={`bg-slate-900/50 p-3 rounded border border-slate-700 ${mode === 'add' ? 'border-orange-500/30' : 'border-indigo-500/30'}`}>
-            <h4 className="text-xs text-slate-500 mb-2 uppercase font-bold">{mode === 'add' ? '加碼進場' : '部分出場'}</h4>
-            <div className="space-y-2">
-              <input type="number" placeholder={mode === 'add' ? '加碼口數' : '賣出口數'} value={actionLots} onChange={e => setActionLots(e.target.value)} className="w-full bg-slate-800 border-slate-600 rounded px-2 py-1 text-white text-sm" />
-              <input type="number" placeholder={mode === 'add' ? '加碼價格' : '賣出價格'} value={actionPrice} onChange={e => setActionPrice(e.target.value)} className="w-full bg-slate-800 border-slate-600 rounded px-2 py-1 text-white text-sm" />
-            </div>
-          </div>
-       </div>
-       <div className="mt-4 pt-4 border-t border-slate-700 relative z-10">
-          {mode === 'add' ? (
-             <div className="flex justify-between items-center bg-orange-900/20 p-3 rounded border border-orange-500/30">
-               <span className="text-sm text-orange-200">新平均成本</span>
-               <span className="text-2xl font-bold text-orange-400">{formatNumber(newAvgCost)}</span>
-             </div>
-          ) : (
-             <div className="flex justify-between items-center bg-indigo-900/20 p-3 rounded border border-indigo-500/30">
-               <span className="text-sm text-indigo-200">實現損益</span>
-               <span className={`text-2xl font-bold ${realizedPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                 {realizedPnL !== null ? (realizedPnL >= 0 ? `+$${formatNumber(realizedPnL)}` : `-$${formatNumber(Math.abs(realizedPnL))}`) : '--'}
-               </span>
-             </div>
-          )}
-       </div>
-    </div>
-  );
-};
-
-// --- 元件：MNQ 計算器 ---
-const MNQCalculator = () => {
-  const [contracts, setContracts] = useState('');
-  const [costPrice, setCostPrice] = useState('');
-  const [targetPrice, setTargetPrice] = useState('');
-  const [calcProfit, setCalcProfit] = useState(null);
-  const [costPriceReverse, setCostPriceReverse] = useState('');
-  const [desiredProfit, setDesiredProfit] = useState('');
-  const [calcTarget, setCalcTarget] = useState(null);
-  const POINT_VALUE = 2;
-  const valuePerPoint = contracts ? (parseFloat(contracts) * POINT_VALUE).toFixed(2) : 0;
-
-  useEffect(() => {
-    if (costPrice && targetPrice && contracts) {
-      const diff = parseFloat(targetPrice) - parseFloat(costPrice);
-      const profit = diff * parseFloat(contracts) * POINT_VALUE;
-      setCalcProfit(profit);
-    } else { setCalcProfit(null); }
-  }, [costPrice, targetPrice, contracts]);
-
-  useEffect(() => {
-    if (costPriceReverse && desiredProfit && contracts) {
-      const totalPointValue = parseFloat(contracts) * POINT_VALUE;
-      if (totalPointValue > 0) {
-        const requiredPoints = parseFloat(desiredProfit) / totalPointValue;
-        setCalcTarget(parseFloat(costPriceReverse) + requiredPoints);
-      }
-    } else { setCalcTarget(null); }
-  }, [costPriceReverse, desiredProfit, contracts]);
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-yellow-900/20 border border-yellow-700/50 p-4 rounded-lg flex items-start space-x-3">
-        <Info className="text-yellow-500 w-5 h-5 flex-shrink-0 mt-0.5" />
-        <div className="text-sm text-yellow-200"><p className="font-bold">MNQ 參數：1 點 = $2 USD</p></div>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
-          <h3 className="text-sm font-bold text-green-400 mb-3">Step 1: 基礎設定</h3>
-          <input type="number" value={contracts} onChange={(e) => setContracts(e.target.value)} className="w-full bg-slate-700 text-white text-lg font-bold border border-slate-600 rounded px-3 py-2" placeholder="Lots" />
-          <div className="mt-2 text-xs text-slate-400">1 點波動 = <span className="text-green-400 font-bold">${valuePerPoint}</span></div>
-        </div>
-        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
-          <h3 className="text-sm font-bold text-blue-400 mb-3">獲利試算</h3>
-          <div className="flex gap-2"><input type="number" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} className="w-1/2 bg-slate-700 border-slate-600 rounded px-2 py-1 text-white text-sm" placeholder="成本" /><input type="number" value={targetPrice} onChange={(e) => setTargetPrice(e.target.value)} className="w-1/2 bg-slate-700 border-slate-600 rounded px-2 py-1 text-white text-sm" placeholder="出場" /></div>
-          <div className="mt-2 text-right text-lg font-bold text-slate-200">{calcProfit ? `$${formatNumber(calcProfit)}` : '--'}</div>
-        </div>
-        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
-          <h3 className="text-sm font-bold text-purple-400 mb-3">目標反推</h3>
-          <div className="flex gap-2"><input type="number" value={costPriceReverse} onChange={(e) => setCostPriceReverse(e.target.value)} className="w-1/2 bg-slate-700 border-slate-600 rounded px-2 py-1 text-white text-sm" placeholder="成本" /><input type="number" value={desiredProfit} onChange={(e) => setDesiredProfit(e.target.value)} className="w-1/2 bg-slate-700 border-slate-600 rounded px-2 py-1 text-white text-sm" placeholder="想賺$" /></div>
-          <div className="mt-2 text-right text-lg font-bold text-slate-200">{calcTarget ? formatNumber(calcTarget) : '--'}</div>
-        </div>
-      </div>
-      <PositionManager />
-    </div>
-  );
-};
-
-// --- 元件：投資紀錄簿 (Page 3) ---
-const InvestmentJournal = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
-  const [records, setRecords] = useState([]);
-  
-  // 表單狀態
-  const [activeForm, setActiveForm] = useState('cost'); // 'cost' or 'withdraw'
-  const [date, setDate] = useState('');
-  const [date2, setDate2] = useState(''); // 用於出金的入帳日
-  const [accountType, setAccountType] = useState('Topstep 考試帳號');
-  const [amount, setAmount] = useState('');
-
-  // 初始化載入
-  useEffect(() => {
-    const saved = localStorage.getItem('trading_journal_records');
-    if (saved) setRecords(JSON.parse(saved));
-  }, []);
-
-  // 儲存
-  useEffect(() => {
-    localStorage.setItem('trading_journal_records', JSON.stringify(records));
-  }, [records]);
-
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (password === '8259') setIsAuthenticated(true);
-    else alert('密碼錯誤');
-  };
-
-  const addRecord = () => {
-    if (!amount || !date) return;
-    const newRecord = {
-      id: Date.now(),
-      type: activeForm, // 'cost' or 'withdraw'
-      date: date,
-      date2: activeForm === 'withdraw' ? date2 : null, // 入帳日
-      accountType: activeForm === 'cost' ? accountType : null,
-      amount: parseFloat(amount),
-    };
-    setRecords([newRecord, ...records]);
-    setAmount('');
-    setDate('');
-    setDate2('');
-  };
-
-  const deleteRecord = (id) => {
-    if(window.confirm('確定刪除此筆紀錄?')) {
-      setRecords(records.filter(r => r.id !== id));
-    }
-  };
-
-  const exportCSV = () => {
-    // 加入 BOM 以防止中文亂碼
-    let csvContent = "\uFEFF類別,日期,入帳日期,帳戶/備註,金額(TWD)\n";
-    records.forEach(r => {
-      const typeStr = r.type === 'cost' ? '投入成本' : '獲利出金';
-      const dateStr = r.date;
-      const date2Str = r.date2 || '-';
-      const desc = r.accountType || '-';
-      csvContent += `${typeStr},${dateStr},${date2Str},${desc},${r.amount}\n`;
-    });
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TopstepX 當沖交易戰情室</title>
     
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `trading_journal_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-  };
+    <!-- 1. 引入 React 和 ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- 2. 引入 Babel 用來在瀏覽器編譯 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- 3. 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
 
-  // 統計邏輯
-  const stats = useMemo(() => {
-    let totalCost = 0;
-    let totalWithdraw = 0;
-    // 按月分組
-    const monthlyData = {};
+    <style>
+        /* 自定義捲軸樣式 (可選) */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        body { background-color: #020617; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
 
-    records.forEach(r => {
-      const monthKey = r.date.substring(0, 7); // YYYY-MM
-      if (!monthlyData[monthKey]) monthlyData[monthKey] = { cost: 0, withdraw: 0 };
+    <script type="text/babel">
+        // --- 解構 React Hooks ---
+        const { useState, useEffect, useMemo } = React;
 
-      if (r.type === 'cost') {
-        totalCost += r.amount;
-        monthlyData[monthKey].cost += r.amount;
-      } else {
-        totalWithdraw += r.amount;
-        monthlyData[monthKey].withdraw += r.amount;
-      }
-    });
-
-    const netPnL = totalWithdraw - totalCost;
-    // ROI = (淨利 / 成本) * 100%. 如果成本為0，避免分母為0
-    const roi = totalCost > 0 ? (netPnL / totalCost) * 100 : (totalWithdraw > 0 ? 100 : 0);
-
-    return { totalCost, totalWithdraw, netPnL, roi, monthlyData };
-  }, [records]);
-
-  if (!isAuthenticated) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400">
-        <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl flex flex-col items-center">
-          <div className="bg-slate-900 p-4 rounded-full mb-4 border border-slate-700">
-            <Lock className="w-8 h-8 text-blue-500" />
-          </div>
-          <h3 className="text-xl font-bold text-white mb-2">請輸入密碼解鎖</h3>
-          <p className="text-sm mb-6">此頁面包含敏感財務資訊</p>
-          <form onSubmit={handleLogin} className="w-full flex gap-2">
-            <input 
-              type="password" 
-              value={password} 
-              onChange={e => setPassword(e.target.value)}
-              className="flex-1 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500 outline-none"
-              placeholder="Password"
-              autoFocus
-            />
-            <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-bold transition-colors">
-              <ArrowRight size={20} />
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* 儀表板 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-          <p className="text-xs text-slate-400 mb-1">總投入成本 (Cost)</p>
-          <p className="text-xl font-bold text-slate-200">{formatTWD(stats.totalCost)}</p>
-        </div>
-        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-          <p className="text-xs text-slate-400 mb-1">總獲利出金 (Profit)</p>
-          <p className="text-xl font-bold text-green-400">{formatTWD(stats.totalWithdraw)}</p>
-        </div>
-        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-          <p className="text-xs text-slate-400 mb-1">淨損益 (Net PnL)</p>
-          <p className={`text-xl font-bold ${stats.netPnL >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
-            {stats.netPnL > 0 ? '+' : ''}{formatTWD(stats.netPnL)}
-          </p>
-        </div>
-        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-          <p className="text-xs text-slate-400 mb-1">投資報酬率 (ROI)</p>
-          <p className={`text-xl font-bold ${stats.roi >= 0 ? 'text-purple-400' : 'text-red-400'}`}>
-            {stats.roi.toFixed(1)}%
-          </p>
-        </div>
-      </div>
-
-      {/* 輸入區塊 */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        <div className="flex border-b border-slate-700">
-          <button 
-            onClick={() => setActiveForm('cost')}
-            className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 ${activeForm === 'cost' ? 'bg-red-900/20 text-red-400 border-b-2 border-red-500' : 'text-slate-400 hover:bg-slate-700'}`}
-          >
-            <MinusCircle size={16} /> 新增費用 (Cost)
-          </button>
-          <button 
-            onClick={() => setActiveForm('withdraw')}
-            className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 ${activeForm === 'withdraw' ? 'bg-green-900/20 text-green-400 border-b-2 border-green-500' : 'text-slate-400 hover:bg-slate-700'}`}
-          >
-            <PlusCircle size={16} /> 新增出金 (Withdraw)
-          </button>
-        </div>
-        <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-          <div className="flex flex-col">
-            <label className="text-xs text-slate-400 mb-1">{activeForm === 'cost' ? '購買日期' : '申請日期'}</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm" />
-          </div>
-          
-          {activeForm === 'withdraw' ? (
-            <div className="flex flex-col">
-              <label className="text-xs text-slate-400 mb-1">入帳日期 (選填)</label>
-              <input type="date" value={date2} onChange={e => setDate2(e.target.value)} className="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm" />
-            </div>
-          ) : (
-            <div className="flex flex-col">
-              <label className="text-xs text-slate-400 mb-1">帳戶型態</label>
-              <select value={accountType} onChange={e => setAccountType(e.target.value)} className="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm">
-                <option>Topstep 考試帳號</option>
-                <option>Topstep 真實帳號</option>
-                <option>Topstep 全開通(Funded)</option>
-                <option>其他平台費用</option>
-              </select>
-            </div>
-          )}
-
-          <div className="flex flex-col">
-            <label className="text-xs text-slate-400 mb-1">金額 (TWD)</label>
-            <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" className="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm" />
-          </div>
-
-          <button onClick={addRecord} className={`h-[38px] rounded font-bold text-white flex items-center justify-center gap-2 ${activeForm === 'cost' ? 'bg-red-600 hover:bg-red-500' : 'bg-green-600 hover:bg-green-500'}`}>
-            新增紀錄
-          </button>
-        </div>
-      </div>
-
-      {/* 列表與匯出 */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-sm font-bold text-slate-300">近期交易紀錄</h3>
-          <button onClick={exportCSV} className="text-xs flex items-center gap-1 bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded transition-colors">
-            <Download size={14} /> 匯出 Google Sheet (CSV)
-          </button>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-slate-400 uppercase bg-slate-900/50">
-              <tr>
-                <th className="px-4 py-3 rounded-l">日期</th>
-                <th className="px-4 py-3">類型</th>
-                <th className="px-4 py-3">說明 / 入帳日</th>
-                <th className="px-4 py-3 text-right">金額 (TWD)</th>
-                <th className="px-4 py-3 rounded-r text-center">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700">
-              {records.length === 0 ? (
-                <tr>
-                  <td colSpan="5" className="px-4 py-8 text-center text-slate-500">尚無紀錄</td>
-                </tr>
-              ) : (
-                records.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-700/50 transition-colors">
-                    <td className="px-4 py-3 text-slate-300">{r.date}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] ${r.type === 'cost' ? 'bg-red-900/30 text-red-400 border border-red-500/30' : 'bg-green-900/30 text-green-400 border border-green-500/30'}`}>
-                        {r.type === 'cost' ? '投入' : '出金'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-400">
-                      {r.type === 'cost' ? r.accountType : `入帳: ${r.date2 || '處理中'}`}
-                    </td>
-                    <td className={`px-4 py-3 text-right font-mono ${r.type === 'cost' ? 'text-red-300' : 'text-green-300'}`}>
-                      {r.type === 'cost' ? '-' : '+'}{formatNumber(r.amount)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button onClick={() => deleteRecord(r.id)} className="text-slate-500 hover:text-red-400 transition-colors">
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- 主程式 ---
-export default function TradingAssistant() {
-  const [activeTab, setActiveTab] = useState('tech');
-  
-  // 技術分析狀態 (保持不變)
-  const [hsHigh, setHsHigh] = useState('');
-  const [hsNeck, setHsNeck] = useState('');
-  const hsTarget = (hsHigh && hsNeck) ? parseFloat(hsNeck) - (parseFloat(hsHigh) - parseFloat(hsNeck)) : null;
-
-  const [wLow, setWLow] = useState('');
-  const [wNeck, setWNeck] = useState('');
-  const wTarget = (wLow && wNeck) ? parseFloat(wNeck) + (parseFloat(wNeck) - parseFloat(wLow)) : null;
-
-  const [nLow1, setNLow1] = useState('');
-  const [nHigh1, setNHigh1] = useState('');
-  const [nLow2, setNLow2] = useState('');
-  const nTarget = (nLow1 && nHigh1 && nLow2) ? parseFloat(nLow2) + (parseFloat(nHigh1) - parseFloat(nLow1)) : null;
-
-  const [rnHigh1, setRnHigh1] = useState('');
-  const [rnLow1, setRnLow1] = useState('');
-  const [rnHigh2, setRnHigh2] = useState('');
-  const rnTarget = (rnHigh1 && rnLow1 && rnHigh2) ? parseFloat(rnHigh2) - (parseFloat(rnHigh1) - parseFloat(rnLow1)) : null;
-
-  // Tab 內容渲染
-  const renderContent = () => {
-    switch(activeTab) {
-      case 'tech':
-        return (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-             <PatternCard
-                title="頭肩頂 (空)" description="頭部-頸線等幅下殺"
-                resultLabel="滿足點" resultValue={hsTarget}
-                inputs={[{ label: "頭部高點", value: hsHigh, onChange: setHsHigh, placeholder: "Head" },{ label: "頸線位置", value: hsNeck, onChange: setHsNeck, placeholder: "Neck" }]}
-                svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-red-400 stroke-2 fill-none"><path d="M10,80 L40,50 L60,80 L100,20 L140,80 L160,50 L190,80" /><line x1="10" y1="80" x2="190" y2="80" className="stroke-slate-600 stroke-1 stroke-dasharray-4" /><text x="100" y="15" className="fill-slate-500 text-[8px]" textAnchor="middle">Head</text></svg>}
-              />
-              <PatternCard
-                title="W 底 (多)" description="底部-頸線等幅上漲"
-                resultLabel="滿足點" resultValue={wTarget}
-                inputs={[{ label: "底部低點", value: wLow, onChange: setWLow, placeholder: "Low" },{ label: "頸線高點", value: wNeck, onChange: setWNeck, placeholder: "Neck" }]}
-                svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-green-400 stroke-2 fill-none"><path d="M10,20 L40,80 L100,40 L160,80 L190,20" /><line x1="10" y1="40" x2="190" y2="40" className="stroke-slate-600 stroke-1 stroke-dasharray-4" /><text x="100" y="95" className="fill-slate-500 text-[8px]" textAnchor="middle">Bottom</text></svg>}
-              />
-              <PatternCard
-                title="N 字 (多)" description="回調不破低，等幅測量"
-                resultLabel="滿足點" resultValue={nTarget}
-                inputs={[{ label: "起漲點 (Low 1)", value: nLow1, onChange: setNLow1, placeholder: "Start" },{ label: "一波高 (High 1)", value: nHigh1, onChange: setNHigh1, placeholder: "High" },{ label: "回調低 (Low 2)", value: nLow2, onChange: setNLow2, placeholder: "Pullback" }]}
-                svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-blue-400 stroke-2 fill-none"><path d="M10,80 L80,20 L120,60 L190,0" /><line x1="10" y1="80" x2="80" y2="80" className="stroke-slate-700 stroke-1" /><text x="80" y="15" className="fill-slate-500 text-[8px]" textAnchor="middle">High1</text><text x="190" y="90" className="fill-blue-500 text-[8px]" textAnchor="end">Target</text></svg>}
-              />
-              <PatternCard
-                title="倒 N 字 (空)" description="反彈不過高，等幅下跌"
-                resultLabel="滿足點" resultValue={rnTarget}
-                inputs={[{ label: "起跌點 (High 1)", value: rnHigh1, onChange: setRnHigh1, placeholder: "Start" },{ label: "一波低 (Low 1)", value: rnLow1, onChange: setRnLow1, placeholder: "Low" },{ label: "反彈高 (High 2)", value: rnHigh2, onChange: setRnHigh2, placeholder: "Rebound" }]}
-                svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-red-400 stroke-2 fill-none"><path d="M10,20 L80,80 L120,40 L190,100" /><line x1="10" y1="20" x2="80" y2="20" className="stroke-slate-700 stroke-1" /><text x="80" y="95" className="fill-slate-500 text-[8px]" textAnchor="middle">Low1</text><text x="190" y="15" className="fill-red-500 text-[8px]" textAnchor="end">Target</text></svg>}
-              />
-          </div>
+        // --- 替代 lucide-react 的圖標組件 (SVG) ---
+        // 為了讓單一 HTML 檔案運作，我們手動定義這些圖標
+        const IconWrapper = ({ children, color = "currentColor", size = 24, className = "" }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke={color} 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className}
+            >
+                {children}
+            </svg>
         );
-      case 'mnq':
-        return <MNQCalculator />;
-      case 'journal':
-        return <InvestmentJournal />;
-      default:
-        return null;
-    }
-  };
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans p-4">
-      <div className="max-w-[1200px] mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b border-slate-800 pb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">TopstepX 交易戰情室</h1>
-            <p className="text-xs text-slate-500">MNQ 當沖輔助工具 v3.0</p>
-          </div>
-          <div className="flex bg-slate-900 p-1 rounded-lg mt-3 md:mt-0 border border-slate-800">
-            <button onClick={() => setActiveTab('tech')} className={`px-4 py-1.5 text-sm rounded-md transition-all flex items-center ${activeTab === 'tech' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>
-              <LineChart className="w-3 h-3 mr-2" /> 圖形
-            </button>
-            <button onClick={() => setActiveTab('mnq')} className={`px-4 py-1.5 text-sm rounded-md transition-all flex items-center ${activeTab === 'mnq' ? 'bg-green-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>
-              <DollarSign className="w-3 h-3 mr-2" /> 算盤
-            </button>
-            <button onClick={() => setActiveTab('journal')} className={`px-4 py-1.5 text-sm rounded-md transition-all flex items-center ${activeTab === 'journal' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>
-              <PieChart className="w-3 h-3 mr-2" /> 投資紀錄
-            </button>
-          </div>
-        </div>
-        <div className="transition-opacity duration-300">
-          {renderContent()}
-        </div>
-      </div>
-    </div>
-  );
-}
+        const LineChart = (props) => <IconWrapper {...props}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></IconWrapper>;
+        const Calculator = (props) => <IconWrapper {...props}><rect x="4" y="2" width="16" height="20" rx="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="16" y1="14" x2="16" y2="14"></line><line x1="12" y1="14" x2="12" y2="14"></line><line x1="8" y1="14" x2="8" y2="14"></line><line x1="16" y1="18" x2="16" y2="18"></line><line x1="12" y1="18" x2="12" y2="18"></line><line x1="8" y1="18" x2="8" y2="18"></line></IconWrapper>;
+        const TrendingUp = (props) => <IconWrapper {...props}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></IconWrapper>;
+        const DollarSign = (props) => <IconWrapper {...props}><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></IconWrapper>;
+        const Target = (props) => <IconWrapper {...props}><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></IconWrapper>;
+        const ArrowRight = (props) => <IconWrapper {...props}><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></IconWrapper>;
+        const Info = (props) => <IconWrapper {...props}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></IconWrapper>;
+        const PlusCircle = (props) => <IconWrapper {...props}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></IconWrapper>;
+        const MinusCircle = (props) => <IconWrapper {...props}><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></IconWrapper>;
+        const Lock = (props) => <IconWrapper {...props}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></IconWrapper>;
+        const Unlock = (props) => <IconWrapper {...props}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></IconWrapper>;
+        const Download = (props) => <IconWrapper {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></IconWrapper>;
+        const Trash2 = (props) => <IconWrapper {...props}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></IconWrapper>;
+        const Wallet = (props) => <IconWrapper {...props}><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"></path><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"></path><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"></path></IconWrapper>;
+        const PieChart = (props) => <IconWrapper {...props}><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></IconWrapper>;
+
+
+        // --- Helper: 格式化數值 ---
+        const formatNumber = (val) => {
+            if (val === null || val === '') return '--';
+            const num = parseFloat(val);
+            if (Number.isInteger(num)) return num.toString();
+            return num.toFixed(2);
+        };
+
+        const formatTWD = (val) => {
+            if (!val) return '$0';
+            return new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(val);
+        };
+
+        // --- 元件：技術分析圖形卡片 ---
+        const PatternCard = ({ title, description, svgContent, inputs, resultLabel, resultValue }) => {
+            return (
+                <div className="bg-slate-800 rounded-lg border border-slate-700 p-3 shadow-lg flex flex-col h-full">
+                    <div className="flex flex-col items-center justify-center bg-slate-900 rounded p-2 border border-slate-800 mb-3">
+                        <h3 className="text-sm font-bold text-slate-200 mb-1">{title}</h3>
+                        <div className="w-full h-20 flex items-center justify-center">
+                            {svgContent}
+                        </div>
+                    </div>
+                    <div className="flex-1 flex flex-col justify-between space-y-2">
+                        <div className="space-y-2">
+                            {inputs.map((input, idx) => (
+                                <div key={idx} className="flex flex-col">
+                                    <label className="text-[10px] text-slate-400 mb-0.5">{input.label}</label>
+                                    <input
+                                        type="number"
+                                        value={input.value}
+                                        onChange={(e) => input.onChange(e.target.value)}
+                                        placeholder={input.placeholder}
+                                        className="w-full bg-slate-700 text-white text-sm border border-slate-600 rounded px-2 py-1 focus:outline-none focus:border-blue-500 transition-colors"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                        <div className="pt-2 border-t border-slate-700 mt-2">
+                            <div className="flex flex-col items-center bg-blue-900/20 p-2 rounded border border-blue-500/20">
+                                <span className="text-[10px] text-blue-300 font-medium mb-1">{resultLabel}</span>
+                                <span className="text-lg font-bold text-white">{formatNumber(resultValue)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 元件：加減碼計算器 ---
+        const PositionManager = () => {
+            const [currentLots, setCurrentLots] = useState('');
+            const [currentCost, setCurrentCost] = useState('');
+            const [actionLots, setActionLots] = useState('');
+            const [actionPrice, setActionPrice] = useState('');
+            const [mode, setMode] = useState('add');
+            const [newAvgCost, setNewAvgCost] = useState(null);
+            const [realizedPnL, setRealizedPnL] = useState(null);
+            const POINT_VALUE = 2;
+
+            useEffect(() => {
+                if (!currentLots || !currentCost || !actionLots || !actionPrice) {
+                    setNewAvgCost(null);
+                    setRealizedPnL(null);
+                    return;
+                }
+                const cLots = parseFloat(currentLots);
+                const cCost = parseFloat(currentCost);
+                const aLots = parseFloat(actionLots);
+                const aPrice = parseFloat(actionPrice);
+
+                if (mode === 'add') {
+                    const totalCost = (cLots * cCost) + (aLots * aPrice);
+                    const totalLots = cLots + aLots;
+                    setNewAvgCost(totalCost / totalLots);
+                    setRealizedPnL(null);
+                } else {
+                    const diff = aPrice - cCost;
+                    const pnl = diff * aLots * POINT_VALUE;
+                    setRealizedPnL(pnl);
+                    setNewAvgCost(cCost);
+                }
+            }, [currentLots, currentCost, actionLots, actionPrice, mode]);
+
+            return (
+                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg relative overflow-hidden mt-6">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                        <TrendingUp size={100} />
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center relative z-10">
+                        <TrendingUp className="mr-2 text-orange-400" /> 
+                        Step 2: 加/減碼 成本試算
+                    </h3>
+                    <div className="flex space-x-4 mb-4 relative z-10">
+                        <button onClick={() => setMode('add')} className={`flex-1 py-2 px-4 rounded flex items-center justify-center transition-all ${mode === 'add' ? 'bg-orange-600 text-white' : 'bg-slate-700 text-slate-400'}`}>
+                            <PlusCircle size={16} className="mr-2" /> 加碼
+                        </button>
+                        <button onClick={() => setMode('reduce')} className={`flex-1 py-2 px-4 rounded flex items-center justify-center transition-all ${mode === 'reduce' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-400'}`}>
+                            <MinusCircle size={16} className="mr-2" /> 減碼
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 relative z-10">
+                        <div className="bg-slate-900/50 p-3 rounded border border-slate-700">
+                            <h4 className="text-xs text-slate-500 mb-2 uppercase font-bold">目前持倉</h4>
+                            <div className="space-y-2">
+                                <input type="number" placeholder="目前口數" value={currentLots} onChange={e => setCurrentLots(e.target.value)} className="w-full bg-slate-800 border-slate-600 rounded px-2 py-1 text-white text-sm" />
+                                <input type="number" placeholder="目前成本" value={currentCost} onChange={e => setCurrentCost(e.target.value)} className="w-full bg-slate-800 border-slate-600 rounded px-2 py-1 text-white text-sm" />
+                            </div>
+                        </div>
+                        <div className={`bg-slate-900/50 p-3 rounded border border-slate-700 ${mode === 'add' ? 'border-orange-500/30' : 'border-indigo-500/30'}`}>
+                            <h4 className="text-xs text-slate-500 mb-2 uppercase font-bold">{mode === 'add' ? '加碼進場' : '部分出場'}</h4>
+                            <div className="space-y-2">
+                                <input type="number" placeholder={mode === 'add' ? '加碼口數' : '賣出口數'} value={actionLots} onChange={e => setActionLots(e.target.value)} className="w-full bg-slate-800 border-slate-600 rounded px-2 py-1 text-white text-sm" />
+                                <input type="number" placeholder={mode === 'add' ? '加碼價格' : '賣出價格'} value={actionPrice} onChange={e => setActionPrice(e.target.value)} className="w-full bg-slate-800 border-slate-600 rounded px-2 py-1 text-white text-sm" />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-slate-700 relative z-10">
+                        {mode === 'add' ? (
+                            <div className="flex justify-between items-center bg-orange-900/20 p-3 rounded border border-orange-500/30">
+                                <span className="text-sm text-orange-200">新平均成本</span>
+                                <span className="text-2xl font-bold text-orange-400">{formatNumber(newAvgCost)}</span>
+                            </div>
+                        ) : (
+                            <div className="flex justify-between items-center bg-indigo-900/20 p-3 rounded border border-indigo-500/30">
+                                <span className="text-sm text-indigo-200">實現損益</span>
+                                <span className={`text-2xl font-bold ${realizedPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    {realizedPnL !== null ? (realizedPnL >= 0 ? `+$${formatNumber(realizedPnL)}` : `-$${formatNumber(Math.abs(realizedPnL))}`) : '--'}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 元件：MNQ 計算器 ---
+        const MNQCalculator = () => {
+            const [contracts, setContracts] = useState('');
+            const [costPrice, setCostPrice] = useState('');
+            const [targetPrice, setTargetPrice] = useState('');
+            const [calcProfit, setCalcProfit] = useState(null);
+            const [costPriceReverse, setCostPriceReverse] = useState('');
+            const [desiredProfit, setDesiredProfit] = useState('');
+            const [calcTarget, setCalcTarget] = useState(null);
+            const POINT_VALUE = 2;
+            const valuePerPoint = contracts ? (parseFloat(contracts) * POINT_VALUE).toFixed(2) : 0;
+
+            useEffect(() => {
+                if (costPrice && targetPrice && contracts) {
+                    const diff = parseFloat(targetPrice) - parseFloat(costPrice);
+                    const profit = diff * parseFloat(contracts) * POINT_VALUE;
+                    setCalcProfit(profit);
+                } else { setCalcProfit(null); }
+            }, [costPrice, targetPrice, contracts]);
+
+            useEffect(() => {
+                if (costPriceReverse && desiredProfit && contracts) {
+                    const totalPointValue = parseFloat(contracts) * POINT_VALUE;
+                    if (totalPointValue > 0) {
+                        const requiredPoints = parseFloat(desiredProfit) / totalPointValue;
+                        setCalcTarget(parseFloat(costPriceReverse) + requiredPoints);
+                    }
+                } else { setCalcTarget(null); }
+            }, [costPriceReverse, desiredProfit, contracts]);
+
+            return (
+                <div className="space-y-6">
+                    <div className="bg-yellow-900/20 border border-yellow-700/50 p-4 rounded-lg flex items-start space-x-3">
+                        <Info className="text-yellow-500 w-5 h-5 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-yellow-200"><p className="font-bold">MNQ 參數：1 點 = $2 USD</p></div>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
+                            <h3 className="text-sm font-bold text-green-400 mb-3">Step 1: 基礎設定</h3>
+                            <input type="number" value={contracts} onChange={(e) => setContracts(e.target.value)} className="w-full bg-slate-700 text-white text-lg font-bold border border-slate-600 rounded px-3 py-2" placeholder="Lots" />
+                            <div className="mt-2 text-xs text-slate-400">1 點波動 = <span className="text-green-400 font-bold">${valuePerPoint}</span></div>
+                        </div>
+                        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
+                            <h3 className="text-sm font-bold text-blue-400 mb-3">獲利試算</h3>
+                            <div className="flex gap-2"><input type="number" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} className="w-1/2 bg-slate-700 border-slate-600 rounded px-2 py-1 text-white text-sm" placeholder="成本" /><input type="number" value={targetPrice} onChange={(e) => setTargetPrice(e.target.value)} className="w-1/2 bg-slate-700 border-slate-600 rounded px-2 py-1 text-white text-sm" placeholder="出場" /></div>
+                            <div className="mt-2 text-right text-lg font-bold text-slate-200">{calcProfit ? `$${formatNumber(calcProfit)}` : '--'}</div>
+                        </div>
+                        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
+                            <h3 className="text-sm font-bold text-purple-400 mb-3">目標反推</h3>
+                            <div className="flex gap-2"><input type="number" value={costPriceReverse} onChange={(e) => setCostPriceReverse(e.target.value)} className="w-1/2 bg-slate-700 border-slate-600 rounded px-2 py-1 text-white text-sm" placeholder="成本" /><input type="number" value={desiredProfit} onChange={(e) => setDesiredProfit(e.target.value)} className="w-1/2 bg-slate-700 border-slate-600 rounded px-2 py-1 text-white text-sm" placeholder="想賺$" /></div>
+                            <div className="mt-2 text-right text-lg font-bold text-slate-200">{calcTarget ? formatNumber(calcTarget) : '--'}</div>
+                        </div>
+                    </div>
+                    <PositionManager />
+                </div>
+            );
+        };
+
+        // --- 元件：投資紀錄簿 ---
+        const InvestmentJournal = () => {
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [password, setPassword] = useState('');
+            const [records, setRecords] = useState([]);
+            
+            const [activeForm, setActiveForm] = useState('cost'); 
+            const [date, setDate] = useState('');
+            const [date2, setDate2] = useState(''); 
+            const [accountType, setAccountType] = useState('Topstep 考試帳號');
+            const [amount, setAmount] = useState('');
+
+            useEffect(() => {
+                const saved = localStorage.getItem('trading_journal_records');
+                if (saved) setRecords(JSON.parse(saved));
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('trading_journal_records', JSON.stringify(records));
+            }, [records]);
+
+            const handleLogin = (e) => {
+                e.preventDefault();
+                if (password === '8259') setIsAuthenticated(true);
+                else alert('密碼錯誤');
+            };
+
+            const addRecord = () => {
+                if (!amount || !date) return;
+                const newRecord = {
+                    id: Date.now(),
+                    type: activeForm,
+                    date: date,
+                    date2: activeForm === 'withdraw' ? date2 : null,
+                    accountType: activeForm === 'cost' ? accountType : null,
+                    amount: parseFloat(amount),
+                };
+                setRecords([newRecord, ...records]);
+                setAmount('');
+                setDate('');
+                setDate2('');
+            };
+
+            const deleteRecord = (id) => {
+                if(window.confirm('確定刪除此筆紀錄?')) {
+                    setRecords(records.filter(r => r.id !== id));
+                }
+            };
+
+            const exportCSV = () => {
+                let csvContent = "\uFEFF類別,日期,入帳日期,帳戶/備註,金額(TWD)\n";
+                records.forEach(r => {
+                    const typeStr = r.type === 'cost' ? '投入成本' : '獲利出金';
+                    const dateStr = r.date;
+                    const date2Str = r.date2 || '-';
+                    const desc = r.accountType || '-';
+                    csvContent += `${typeStr},${dateStr},${date2Str},${desc},${r.amount}\n`;
+                });
+                
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", `trading_journal_${new Date().toISOString().slice(0,10)}.csv`);
+                document.body.appendChild(link);
+                link.click();
+            };
+
+            const stats = useMemo(() => {
+                let totalCost = 0;
+                let totalWithdraw = 0;
+                records.forEach(r => {
+                    if (r.type === 'cost') totalCost += r.amount;
+                    else totalWithdraw += r.amount;
+                });
+                const netPnL = totalWithdraw - totalCost;
+                const roi = totalCost > 0 ? (netPnL / totalCost) * 100 : (totalWithdraw > 0 ? 100 : 0);
+                return { totalCost, totalWithdraw, netPnL, roi };
+            }, [records]);
+
+            if (!isAuthenticated) {
+                return (
+                    <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400">
+                        <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl flex flex-col items-center">
+                            <div className="bg-slate-900 p-4 rounded-full mb-4 border border-slate-700">
+                                <Lock className="w-8 h-8 text-blue-500" />
+                            </div>
+                            <h3 className="text-xl font-bold text-white mb-2">請輸入密碼解鎖</h3>
+                            <form onSubmit={handleLogin} className="w-full flex gap-2">
+                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="flex-1 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white outline-none" autoFocus />
+                                <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-bold"><ArrowRight size={20} /></button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                            <p className="text-xs text-slate-400 mb-1">總投入成本</p>
+                            <p className="text-xl font-bold text-slate-200">{formatTWD(stats.totalCost)}</p>
+                        </div>
+                        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                            <p className="text-xs text-slate-400 mb-1">總獲利出金</p>
+                            <p className="text-xl font-bold text-green-400">{formatTWD(stats.totalWithdraw)}</p>
+                        </div>
+                        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                            <p className="text-xs text-slate-400 mb-1">淨損益</p>
+                            <p className={`text-xl font-bold ${stats.netPnL >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{stats.netPnL > 0 ? '+' : ''}{formatTWD(stats.netPnL)}</p>
+                        </div>
+                        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                            <p className="text-xs text-slate-400 mb-1">投資報酬率 (ROI)</p>
+                            <p className={`text-xl font-bold ${stats.roi >= 0 ? 'text-purple-400' : 'text-red-400'}`}>{stats.roi.toFixed(1)}%</p>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                        <div className="flex border-b border-slate-700">
+                            <button onClick={() => setActiveForm('cost')} className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 ${activeForm === 'cost' ? 'bg-red-900/20 text-red-400 border-b-2 border-red-500' : 'text-slate-400 hover:bg-slate-700'}`}>
+                                <MinusCircle size={16} /> 新增費用
+                            </button>
+                            <button onClick={() => setActiveForm('withdraw')} className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 ${activeForm === 'withdraw' ? 'bg-green-900/20 text-green-400 border-b-2 border-green-500' : 'text-slate-400 hover:bg-slate-700'}`}>
+                                <PlusCircle size={16} /> 新增出金
+                            </button>
+                        </div>
+                        <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                            <div className="flex flex-col">
+                                <label className="text-xs text-slate-400 mb-1">{activeForm === 'cost' ? '購買日期' : '申請日期'}</label>
+                                <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm" />
+                            </div>
+                            
+                            {activeForm === 'withdraw' ? (
+                                <div className="flex flex-col">
+                                    <label className="text-xs text-slate-400 mb-1">入帳日期 (選填)</label>
+                                    <input type="date" value={date2} onChange={e => setDate2(e.target.value)} className="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm" />
+                                </div>
+                            ) : (
+                                <div className="flex flex-col">
+                                    <label className="text-xs text-slate-400 mb-1">帳戶型態</label>
+                                    <select value={accountType} onChange={e => setAccountType(e.target.value)} className="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm">
+                                        <option>Topstep 考試帳號</option>
+                                        <option>Topstep 真實帳號</option>
+                                        <option>Topstep 全開通(Funded)</option>
+                                        <option>其他平台費用</option>
+                                    </select>
+                                </div>
+                            )}
+
+                            <div className="flex flex-col">
+                                <label className="text-xs text-slate-400 mb-1">金額 (TWD)</label>
+                                <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" className="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm" />
+                            </div>
+
+                            <button onClick={addRecord} className={`h-[38px] rounded font-bold text-white flex items-center justify-center gap-2 ${activeForm === 'cost' ? 'bg-red-600 hover:bg-red-500' : 'bg-green-600 hover:bg-green-500'}`}>
+                                新增紀錄
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-sm font-bold text-slate-300">近期交易紀錄</h3>
+                            <button onClick={exportCSV} className="text-xs flex items-center gap-1 bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded transition-colors">
+                                <Download size={14} /> 匯出 CSV
+                            </button>
+                        </div>
+                        
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-xs text-slate-400 uppercase bg-slate-900/50">
+                                    <tr>
+                                        <th className="px-4 py-3 rounded-l">日期</th>
+                                        <th className="px-4 py-3">類型</th>
+                                        <th className="px-4 py-3">說明</th>
+                                        <th className="px-4 py-3 text-right">金額</th>
+                                        <th className="px-4 py-3 rounded-r text-center">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-700">
+                                    {records.map((r) => (
+                                        <tr key={r.id} className="hover:bg-slate-700/50">
+                                            <td className="px-4 py-3 text-slate-300">{r.date}</td>
+                                            <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-[10px] ${r.type === 'cost' ? 'bg-red-900/30 text-red-400' : 'bg-green-900/30 text-green-400'}`}>{r.type === 'cost' ? '投入' : '出金'}</span></td>
+                                            <td className="px-4 py-3 text-slate-400">{r.type === 'cost' ? r.accountType : `入帳: ${r.date2 || '處理中'}`}</td>
+                                            <td className={`px-4 py-3 text-right font-mono ${r.type === 'cost' ? 'text-red-300' : 'text-green-300'}`}>{r.type === 'cost' ? '-' : '+'}{formatNumber(r.amount)}</td>
+                                            <td className="px-4 py-3 text-center"><button onClick={() => deleteRecord(r.id)} className="text-slate-500 hover:text-red-400"><Trash2 size={14} /></button></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 主程式 ---
+        const TradingAssistant = () => {
+            const [activeTab, setActiveTab] = useState('tech');
+            const [hsHigh, setHsHigh] = useState('');
+            const [hsNeck, setHsNeck] = useState('');
+            const hsTarget = (hsHigh && hsNeck) ? parseFloat(hsNeck) - (parseFloat(hsHigh) - parseFloat(hsNeck)) : null;
+            const [wLow, setWLow] = useState('');
+            const [wNeck, setWNeck] = useState('');
+            const wTarget = (wLow && wNeck) ? parseFloat(wNeck) + (parseFloat(wNeck) - parseFloat(wLow)) : null;
+            const [nLow1, setNLow1] = useState('');
+            const [nHigh1, setNHigh1] = useState('');
+            const [nLow2, setNLow2] = useState('');
+            const nTarget = (nLow1 && nHigh1 && nLow2) ? parseFloat(nLow2) + (parseFloat(nHigh1) - parseFloat(nLow1)) : null;
+            const [rnHigh1, setRnHigh1] = useState('');
+            const [rnLow1, setRnLow1] = useState('');
+            const [rnHigh2, setRnHigh2] = useState('');
+            const rnTarget = (rnHigh1 && rnLow1 && rnHigh2) ? parseFloat(rnHigh2) - (parseFloat(rnHigh1) - parseFloat(rnLow1)) : null;
+
+            const renderContent = () => {
+                switch(activeTab) {
+                    case 'tech': return (
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                            <PatternCard title="頭肩頂 (空)" description="頭部-頸線等幅下殺" resultLabel="滿足點" resultValue={hsTarget} inputs={[{ label: "頭部高點", value: hsHigh, onChange: setHsHigh, placeholder: "Head" },{ label: "頸線位置", value: hsNeck, onChange: setHsNeck, placeholder: "Neck" }]} svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-red-400 stroke-2 fill-none"><path d="M10,80 L40,50 L60,80 L100,20 L140,80 L160,50 L190,80" /><line x1="10" y1="80" x2="190" y2="80" className="stroke-slate-600 stroke-1 stroke-dasharray-4" /><text x="100" y="15" className="fill-slate-500 text-[8px]" textAnchor="middle">Head</text></svg>} />
+                            <PatternCard title="W 底 (多)" description="底部-頸線等幅上漲" resultLabel="滿足點" resultValue={wTarget} inputs={[{ label: "底部低點", value: wLow, onChange: setWLow, placeholder: "Low" },{ label: "頸線高點", value: wNeck, onChange: setWNeck, placeholder: "Neck" }]} svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-green-400 stroke-2 fill-none"><path d="M10,20 L40,80 L100,40 L160,80 L190,20" /><line x1="10" y1="40" x2="190" y2="40" className="stroke-slate-600 stroke-1 stroke-dasharray-4" /><text x="100" y="95" className="fill-slate-500 text-[8px]" textAnchor="middle">Bottom</text></svg>} />
+                            <PatternCard title="N 字 (多)" description="回調不破低，等幅測量" resultLabel="滿足點" resultValue={nTarget} inputs={[{ label: "起漲點 (Low 1)", value: nLow1, onChange: setNLow1, placeholder: "Start" },{ label: "一波高 (High 1)", value: nHigh1, onChange: setNHigh1, placeholder: "High" },{ label: "回調低 (Low 2)", value: nLow2, onChange: setNLow2, placeholder: "Pullback" }]} svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-blue-400 stroke-2 fill-none"><path d="M10,80 L80,20 L120,60 L190,0" /><line x1="10" y1="80" x2="80" y2="80" className="stroke-slate-700 stroke-1" /><text x="80" y="15" className="fill-slate-500 text-[8px]" textAnchor="middle">High1</text><text x="190" y="90" className="fill-blue-500 text-[8px]" textAnchor="end">Target</text></svg>} />
+                            <PatternCard title="倒 N 字 (空)" description="反彈不過高，等幅下跌" resultLabel="滿足點" resultValue={rnTarget} inputs={[{ label: "起跌點 (High 1)", value: rnHigh1, onChange: setRnHigh1, placeholder: "Start" },{ label: "一波低 (Low 1)", value: rnLow1, onChange: setRnLow1, placeholder: "Low" },{ label: "反彈高 (High 2)", value: rnHigh2, onChange: setRnHigh2, placeholder: "Rebound" }]} svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-red-400 stroke-2 fill-none"><path d="M10,20 L80,80 L120,40 L190,100" /><line x1="10" y1="20" x2="80" y2="20" className="stroke-slate-700 stroke-1" /><text x="80" y="95" className="fill-slate-500 text-[8px]" textAnchor="middle">Low1</text><text x="190" y="15" className="fill-red-500 text-[8px]" textAnchor="end">Target</text></svg>} />
+                        </div>
+                    );
+                    case 'mnq': return <MNQCalculator />;
+                    case 'journal': return <InvestmentJournal />;
+                    default: return null;
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-950 text-slate-200 font-sans p-4">
+                    <div className="max-w-[1200px] mx-auto">
+                        <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b border-slate-800 pb-4">
+                            <div>
+                                <h1 className="text-2xl font-bold text-white tracking-tight">TopstepX 交易戰情室</h1>
+                                <p className="text-xs text-slate-500">MNQ 當沖輔助工具 v3.0</p>
+                            </div>
+                            <div className="flex bg-slate-900 p-1 rounded-lg mt-3 md:mt-0 border border-slate-800">
+                                <button onClick={() => setActiveTab('tech')} className={`px-4 py-1.5 text-sm rounded-md transition-all flex items-center ${activeTab === 'tech' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>
+                                    <LineChart className="w-3 h-3 mr-2" /> 圖形
+                                </button>
+                                <button onClick={() => setActiveTab('mnq')} className={`px-4 py-1.5 text-sm rounded-md transition-all flex items-center ${activeTab === 'mnq' ? 'bg-green-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>
+                                    <DollarSign className="w-3 h-3 mr-2" /> 算盤
+                                </button>
+                                <button onClick={() => setActiveTab('journal')} className={`px-4 py-1.5 text-sm rounded-md transition-all flex items-center ${activeTab === 'journal' ? 'bg-purple-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>
+                                    <PieChart className="w-3 h-3 mr-2" /> 投資紀錄
+                                </button>
+                            </div>
+                        </div>
+                        <div className="transition-opacity duration-300">
+                            {renderContent()}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<TradingAssistant />);
+    </script>
+</body>
+</html>
