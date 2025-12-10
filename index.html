@@ -102,7 +102,7 @@
             );
         };
 
-        // --- 元件：Fibonacci 計算卡片 (新增) ---
+        // --- 元件：Fibonacci 計算卡片 (修正版) ---
         const FibCard = ({ title, svgContent, inputs, levels }) => {
             return (
                 <div className="bg-slate-800 rounded-lg border border-slate-700 p-3 shadow-lg flex flex-col h-full">
@@ -128,11 +128,11 @@
                             ))}
                         </div>
                         <div className="pt-2 border-t border-slate-700 mt-2 space-y-1">
-                            <div className="text-[10px] text-center text-slate-500 mb-1">關鍵支撐/壓力位</div>
+                            <div className="text-[10px] text-center text-slate-500 mb-1">關鍵價位 (Key Levels)</div>
                             {levels.map((lvl, idx) => (
                                 <div key={idx} className={`flex justify-between items-center px-2 py-1 rounded border ${lvl.highlight ? 'bg-yellow-900/20 border-yellow-500/30' : 'bg-slate-900/40 border-slate-700/50'}`}>
-                                    <span className={`text-[10px] ${lvl.highlight ? 'text-yellow-400 font-bold' : 'text-slate-400'}`}>{lvl.label}</span>
-                                    <span className={`text-sm font-bold ${lvl.highlight ? 'text-yellow-200' : 'text-slate-200'}`}>{formatNumber(lvl.value)}</span>
+                                    <span className={`text-[10px] truncate pr-2 ${lvl.highlight ? 'text-yellow-400 font-bold' : 'text-slate-400'}`}>{lvl.label}</span>
+                                    <span className={`text-sm font-bold whitespace-nowrap ${lvl.highlight ? 'text-yellow-200' : 'text-slate-200'}`}>{formatNumber(lvl.value)}</span>
                                 </div>
                             ))}
                         </div>
@@ -508,20 +508,22 @@
             const [fibBullLow, setFibBullLow] = useState('');
             const [fibBullHigh, setFibBullHigh] = useState('');
             const bullRange = (fibBullHigh && fibBullLow) ? parseFloat(fibBullHigh) - parseFloat(fibBullLow) : 0;
+            // 修正：依照使用者定義 - 0.382 弱勢回檔(支撐強)，0.618 強勢回檔(支撐弱)
             const bullLevels = bullRange > 0 ? [
-                { label: '0.618 (黃金)', value: parseFloat(fibBullHigh) - (bullRange * 0.618), highlight: true },
-                { label: '0.500 (中關)', value: parseFloat(fibBullHigh) - (bullRange * 0.5), highlight: false },
-                { label: '0.382 (弱撐)', value: parseFloat(fibBullHigh) - (bullRange * 0.382), highlight: false }
+                { label: '0.618 強勢回檔 (支撐弱)', value: parseFloat(fibBullHigh) - (bullRange * 0.618), highlight: true }, // 深回檔
+                { label: '0.500 中關', value: parseFloat(fibBullHigh) - (bullRange * 0.5), highlight: false },
+                { label: '0.382 弱勢回檔 (支撐強)', value: parseFloat(fibBullHigh) - (bullRange * 0.382), highlight: true }  // 淺回檔
             ] : [{ label: '0.618', value: null }, { label: '0.500', value: null }, { label: '0.382', value: null }];
 
             // 空頭反彈 (High -> Low): 計算壓力
             const [fibBearHigh, setFibBearHigh] = useState('');
             const [fibBearLow, setFibBearLow] = useState('');
             const bearRange = (fibBearHigh && fibBearLow) ? parseFloat(fibBearHigh) - parseFloat(fibBearLow) : 0;
+            // 修正：依照使用者定義 - 0.382 弱勢反彈(容易續跌)，0.618 強勢反彈(有望反轉)
             const bearLevels = bearRange > 0 ? [
-                { label: '0.618 (黃金)', value: parseFloat(fibBearLow) + (bearRange * 0.618), highlight: true },
-                { label: '0.500 (中關)', value: parseFloat(fibBearLow) + (bearRange * 0.5), highlight: false },
-                { label: '0.382 (弱壓)', value: parseFloat(fibBearLow) + (bearRange * 0.382), highlight: false }
+                { label: '0.618 強勢反彈 (有望反轉)', value: parseFloat(fibBearLow) + (bearRange * 0.618), highlight: true }, // 強反彈
+                { label: '0.500 中關', value: parseFloat(fibBearLow) + (bearRange * 0.5), highlight: false },
+                { label: '0.382 弱勢反彈 (容易續跌)', value: parseFloat(fibBearLow) + (bearRange * 0.382), highlight: true }  // 弱反彈
             ] : [{ label: '0.618', value: null }, { label: '0.500', value: null }, { label: '0.382', value: null }];
 
             const renderContent = () => {
@@ -533,17 +535,17 @@
                             <PatternCard title="N 字 (多)" description="回調不破低，等幅測量" resultLabel="滿足點" resultValue={nTarget} inputs={[{ label: "起漲點 (Low 1)", value: nLow1, onChange: setNLow1, placeholder: "Start" },{ label: "一波高 (High 1)", value: nHigh1, onChange: setNHigh1, placeholder: "High" },{ label: "回調低 (Low 2)", value: nLow2, onChange: setNLow2, placeholder: "Pullback" }]} svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-blue-400 stroke-2 fill-none"><path d="M10,80 L80,20 L120,60 L190,0" /><line x1="10" y1="80" x2="80" y2="80" className="stroke-slate-700 stroke-1" /><text x="80" y="15" className="fill-slate-500 text-[8px]" textAnchor="middle">High1</text><text x="190" y="90" className="fill-blue-500 text-[8px]" textAnchor="end">Target</text></svg>} />
                             <PatternCard title="倒 N 字 (空)" description="反彈不過高，等幅下跌" resultLabel="滿足點" resultValue={rnTarget} inputs={[{ label: "起跌點 (High 1)", value: rnHigh1, onChange: setRnHigh1, placeholder: "Start" },{ label: "一波低 (Low 1)", value: rnLow1, onChange: setRnLow1, placeholder: "Low" },{ label: "反彈高 (High 2)", value: rnHigh2, onChange: setRnHigh2, placeholder: "Rebound" }]} svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-red-400 stroke-2 fill-none"><path d="M10,20 L80,80 L120,40 L190,100" /><line x1="10" y1="20" x2="80" y2="20" className="stroke-slate-700 stroke-1" /><text x="80" y="95" className="fill-slate-500 text-[8px]" textAnchor="middle">Low1</text><text x="190" y="15" className="fill-red-500 text-[8px]" textAnchor="end">Target</text></svg>} />
                             
-                            {/* 新增: 黃金回檔 (多) */}
+                            {/* 修正: 回檔 (多) */}
                             <FibCard 
-                                title="黃金回檔 (找支撐)" 
+                                title="回檔計算 (找支撐)" 
                                 inputs={[{ label: "起漲點 (Low)", value: fibBullLow, onChange: setFibBullLow, placeholder: "Start Low" },{ label: "波段高點 (High)", value: fibBullHigh, onChange: setFibBullHigh, placeholder: "Swing High" }]}
                                 levels={bullLevels}
                                 svgContent={<svg viewBox="0 0 200 100" className="w-full h-full fill-none"><path d="M10,90 L100,10 L140,50 L190,20" className="stroke-green-400 stroke-2" /><line x1="100" y1="10" x2="190" y2="10" className="stroke-slate-600 stroke-1 stroke-dasharray-2" /><line x1="100" y1="50" x2="190" y2="50" className="stroke-yellow-500 stroke-1 stroke-dasharray-2" /><text x="190" y="45" className="fill-yellow-500 text-[8px]" textAnchor="end">0.618</text></svg>}
                             />
 
-                            {/* 新增: 黃金反彈 (空) */}
+                            {/* 修正: 反彈 (空) */}
                             <FibCard 
-                                title="黃金反彈 (找壓力)" 
+                                title="反彈計算 (找壓力)" 
                                 inputs={[{ label: "起跌點 (High)", value: fibBearHigh, onChange: setFibBearHigh, placeholder: "Start High" },{ label: "波段低點 (Low)", value: fibBearLow, onChange: setFibBearLow, placeholder: "Swing Low" }]}
                                 levels={bearLevels}
                                 svgContent={<svg viewBox="0 0 200 100" className="w-full h-full fill-none"><path d="M10,10 L100,90 L140,50 L190,80" className="stroke-red-400 stroke-2" /><line x1="100" y1="90" x2="190" y2="90" className="stroke-slate-600 stroke-1 stroke-dasharray-2" /><line x1="100" y1="50" x2="190" y2="50" className="stroke-yellow-500 stroke-1 stroke-dasharray-2" /><text x="190" y="45" className="fill-yellow-500 text-[8px]" textAnchor="end">0.618</text></svg>}
@@ -562,7 +564,7 @@
                         <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b border-slate-800 pb-4">
                             <div>
                                 <h1 className="text-2xl font-bold text-white tracking-tight">TopstepX 交易戰情室</h1>
-                                <p className="text-xs text-slate-500">MNQ 當沖輔助工具 v3.1</p>
+                                <p className="text-xs text-slate-500">MNQ 當沖輔助工具 v3.2</p>
                             </div>
                             <div className="flex bg-slate-900 p-1 rounded-lg mt-3 md:mt-0 border border-slate-800">
                                 <button onClick={() => setActiveTab('tech')} className={`px-4 py-1.5 text-sm rounded-md transition-all flex items-center ${activeTab === 'tech' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>
