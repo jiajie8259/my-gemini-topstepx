@@ -89,8 +89,8 @@
         const formatUSD = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val || 0);
         const formatNumber = (val) => { if (val === null || val === '' || isNaN(val)) return '--'; const num = parseFloat(val); return Number.isInteger(num) ? num.toString() : num.toFixed(2); };
 
-        // --- 技術分析圖形卡片 (補回) ---
-        const PatternCard = ({ title, svgContent, inputs, resultLabel, resultValue }) => (
+        // --- 技術分析圖形卡片 (支援雙倍幅顯示) ---
+        const PatternCard = ({ title, svgContent, inputs, results }) => (
             <div className="bg-slate-800 rounded-lg border border-slate-700 p-3 shadow-lg flex flex-col h-full">
                 <div className="flex flex-col items-center justify-center bg-slate-900 rounded p-2 border border-slate-800 mb-3">
                     <h3 className="text-sm font-bold text-slate-200 mb-1">{title}</h3>
@@ -106,9 +106,13 @@
                         ))}
                     </div>
                     <div className="pt-2 border-t border-slate-700 mt-2">
-                        <div className="flex flex-col items-center bg-blue-900/20 p-2 rounded border border-blue-500/20">
-                            <span className="text-[10px] text-blue-300 font-medium mb-1">{resultLabel}</span>
-                            <span className="text-lg font-bold text-white">{formatNumber(resultValue)}</span>
+                        <div className="grid grid-cols-2 gap-2">
+                            {results.map((res, idx) => (
+                                <div key={idx} className={`flex flex-col items-center p-1.5 rounded border ${res.color === 'purple' ? 'bg-purple-900/20 border-purple-500/30' : 'bg-blue-900/20 border-blue-500/20'}`}>
+                                    <span className={`text-[10px] font-medium mb-0.5 whitespace-nowrap ${res.color === 'purple' ? 'text-purple-300' : 'text-blue-300'}`}>{res.label}</span>
+                                    <span className={`text-sm font-bold ${res.color === 'purple' ? 'text-purple-100' : 'text-white'}`}>{formatNumber(res.value)}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
@@ -143,7 +147,7 @@
             </div>
         );
 
-        // --- 加減碼模組 (補回) ---
+        // --- 加減碼模組 ---
         const PositionManager = () => {
             const [currentLots, setCurrentLots] = useState('');
             const [currentCost, setCurrentCost] = useState('');
@@ -201,7 +205,7 @@
             );
         };
 
-        // --- MNQ 計算器 (補回) ---
+        // --- MNQ 計算器 ---
         const MNQCalculator = () => {
             const [contracts, setContracts] = useState('');
             const [costPrice, setCostPrice] = useState('');
@@ -252,27 +256,31 @@
             );
         };
 
-        // --- 核心邏輯：InvestmentJournal (雲端版) ---
+        // --- 核心邏輯：InvestmentJournal ---
         const InvestmentJournal = () => {
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [password, setPassword] = useState('');
             const [records, setRecords] = useState([]);
             const [user, setUser] = useState(null);
+            const [authError, setAuthError] = useState(null);
             const [subTab, setSubTab] = useState('entries');
 
-            // 1. Firebase 匿名登入 (遵守 Rule: auth != null)
             useEffect(() => {
                 const { FB_AUTH, FB_METHODS } = window;
                 if (!FB_AUTH) return;
 
-                FB_METHODS.signInAnonymously(FB_AUTH).catch(console.error);
+                FB_METHODS.signInAnonymously(FB_AUTH)
+                    .catch(err => {
+                        console.error(err);
+                        setAuthError(err.message);
+                    });
+                
                 const unsubscribe = FB_METHODS.onAuthStateChanged(FB_AUTH, (u) => {
                     setUser(u);
                 });
                 return () => unsubscribe();
             }, []);
 
-            // 2. 監聽 Firestore 資料 (Real-time Sync)
             useEffect(() => {
                 const { FB_DB, FB_METHODS, FB_APP_ID } = window;
                 if (!user || !FB_DB) return;
@@ -317,13 +325,26 @@
                             <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white" autoFocus />
                             <button type="submit" className="bg-blue-600 px-4 py-2 rounded text-white"><ArrowRight size={20} /></button>
                         </form>
-                        <p className="mt-4 text-[10px] text-slate-500">{user ? '● 雲端連線已就緒' : '○ 正在連接資料庫...'}</p>
+                        <p className="mt-4 text-[10px] text-slate-500">
+                            {authError ? <span className="text-red-500">連線錯誤: {authError} (請檢查 Firebase Authentication 設定)</span> : 
+                             user ? '● 雲端連線已就緒' : '○ 正在連接資料庫...'}
+                        </p>
                     </div>
                 </div>
             );
 
             return (
                 <div className="space-y-6">
+                    {!user && !authError && (
+                        <div className="bg-yellow-900/30 border border-yellow-500/50 p-2 rounded text-xs text-yellow-200 flex items-center justify-center animate-pulse">
+                            連線中... 請稍候
+                        </div>
+                    )}
+                    {authError && (
+                        <div className="bg-red-900/30 border border-red-500/50 p-2 rounded text-xs text-red-200 flex items-center justify-center">
+                            ⚠️ 錯誤: {authError}。請至 Firebase Console 開啟「Anonymous」登入。
+                        </div>
+                    )}
                     <div className="flex space-x-2 border-b border-slate-800 pb-2">
                          <button onClick={() => setSubTab('entries')} className={`px-4 py-2 rounded-t-lg text-sm font-bold flex items-center transition-colors ${subTab === 'entries' ? 'bg-slate-800 text-white border-t border-x border-slate-700' : 'text-slate-400 hover:text-slate-200'}`}><List size={14} className="mr-2"/> 帳務明細</button>
                          <button onClick={() => setSubTab('analysis')} className={`px-4 py-2 rounded-t-lg text-sm font-bold flex items-center transition-colors ${subTab === 'analysis' ? 'bg-slate-800 text-white border-t border-x border-slate-700' : 'text-slate-400 hover:text-slate-200'}`}><BarChart2 size={14} className="mr-2"/> 成效分析</button>
@@ -336,13 +357,11 @@
             );
         };
 
-        // --- 子元件：帳務明細 (Entries) ---
         const JournalEntries = ({ records, onAdd, onUpdate, onDelete }) => {
             const [isEditing, setIsEditing] = useState(false);
             const [editId, setEditId] = useState(null);
             const [activeForm, setActiveForm] = useState('cost');
             
-            // 表單欄位
             const [date, setDate] = useState('');
             const [accountType, setAccountType] = useState('Topstep 考試帳號');
             const [amountTWD, setAmountTWD] = useState('');
@@ -353,12 +372,10 @@
             const [twdFee, setTwdFee] = useState('');
             const [remittanceDate, setRemittanceDate] = useState('');
 
-            // 排序資料：依日期由新到舊
             const sortedRecords = useMemo(() => {
                 return [...records].sort((a, b) => new Date(b.date) - new Date(a.date));
             }, [records]);
 
-            // 載入編輯資料
             const handleEdit = (r) => {
                 setIsEditing(true); setEditId(r.id); setActiveForm(r.type); setDate(r.date);
                 if (r.type === 'cost') {
@@ -441,7 +458,7 @@
                     </div>
 
                     <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-                        <table className="w-full text-sm text-left">
+                        <table className="w-full text-sm text-left text-slate-300">
                             <thead className="text-xs text-slate-500 uppercase bg-slate-900/50">
                                 <tr>
                                     <th className="px-4 py-3">日期</th>
@@ -496,7 +513,6 @@
             );
         };
 
-        // --- 子元件：成效分析 (Analysis) ---
         const JournalAnalysis = ({ records }) => {
             const stats = useMemo(() => {
                 let totalCost = 0; let totalWithdrawNetTWD = 0; let totalWithdrawUSD = 0;
@@ -542,7 +558,6 @@
             );
         };
 
-        // --- 子元件：達陣目標 (Goals) ---
         const JournalGoals = ({ records }) => {
             const currentYear = new Date().getFullYear();
             const months = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -615,15 +630,30 @@
         const TradingAssistant = () => {
             const [activeTab, setActiveTab] = useState('tech');
 
-            // --- 測幅狀態 (保持原樣) ---
+            // --- 測幅狀態 ---
+            // 頭肩頂
             const [hsHigh, setHsHigh] = useState(''); const [hsNeck, setHsNeck] = useState('');
-            const hsTarget = (hsHigh && hsNeck) ? parseFloat(hsNeck) - (parseFloat(hsHigh) - parseFloat(hsNeck)) : null;
+            const hsDist = (hsHigh && hsNeck) ? parseFloat(hsHigh) - parseFloat(hsNeck) : 0;
+            const hsTarget1 = hsDist ? parseFloat(hsNeck) - hsDist : null;
+            const hsTarget2 = hsDist ? parseFloat(hsNeck) - (2 * hsDist) : null;
+            
+            // W底
             const [wLow, setWLow] = useState(''); const [wNeck, setWNeck] = useState('');
-            const wTarget = (wLow && wNeck) ? parseFloat(wNeck) + (parseFloat(wNeck) - parseFloat(wLow)) : null;
+            const wDist = (wLow && wNeck) ? parseFloat(wNeck) - parseFloat(wLow) : 0;
+            const wTarget1 = wDist ? parseFloat(wNeck) + wDist : null;
+            const wTarget2 = wDist ? parseFloat(wNeck) + (2 * wDist) : null;
+
+            // N字
             const [nLow1, setNLow1] = useState(''); const [nHigh1, setNHigh1] = useState(''); const [nLow2, setNLow2] = useState('');
-            const nTarget = (nLow1 && nHigh1 && nLow2) ? parseFloat(nLow2) + (parseFloat(nHigh1) - parseFloat(nLow1)) : null;
+            const nDist = (nLow1 && nHigh1) ? parseFloat(nHigh1) - parseFloat(nLow1) : 0;
+            const nTarget1 = (nDist && nLow2) ? parseFloat(nLow2) + nDist : null;
+            const nTarget2 = (nDist && nLow2) ? parseFloat(nLow2) + (2 * nDist) : null;
+
+            // 倒N字
             const [rnHigh1, setRnHigh1] = useState(''); const [rnLow1, setRnLow1] = useState(''); const [rnHigh2, setRnHigh2] = useState('');
-            const rnTarget = (rnHigh1 && rnLow1 && rnHigh2) ? parseFloat(rnHigh2) - (parseFloat(rnHigh1) - parseFloat(rnLow1)) : null;
+            const rnDist = (rnHigh1 && rnLow1) ? parseFloat(rnHigh1) - parseFloat(rnLow1) : 0;
+            const rnTarget1 = (rnDist && rnHigh2) ? parseFloat(rnHigh2) - rnDist : null;
+            const rnTarget2 = (rnDist && rnHigh2) ? parseFloat(rnHigh2) - (2 * rnDist) : null;
 
             // --- 回檔狀態 (保持原樣) ---
             const [fbL, setFbL] = useState(''); const [fbH, setFbH] = useState('');
@@ -657,10 +687,42 @@
 
                         {activeTab === 'tech' && (
                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                                <PatternCard title="頭肩頂 (空)" resultLabel="滿足點" resultValue={hsTarget} inputs={[{ label: "頭部高點", value: hsHigh, onChange: setHsHigh },{ label: "頸線位置", value: hsNeck, onChange: setHsNeck }]} svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-red-400 stroke-2 fill-none"><path d="M10,80 L40,50 L60,80 L100,20 L140,80 L160,50 L190,80" /><line x1="10" y1="80" x2="190" y2="80" className="stroke-slate-700 stroke-1 stroke-dasharray-4" /></svg>} />
-                                <PatternCard title="W 底 (多)" resultLabel="滿足點" resultValue={wTarget} inputs={[{ label: "底部低點", value: wLow, onChange: setWLow },{ label: "頸線高點", value: wNeck, onChange: setWNeck }]} svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-green-400 stroke-2 fill-none"><path d="M10,20 L40,80 L100,40 L160,80 L190,20" /><line x1="10" y1="40" x2="190" y2="40" className="stroke-slate-700 stroke-1 stroke-dasharray-4" /></svg>} />
-                                <PatternCard title="N 字 (多)" resultLabel="滿足點" resultValue={nTarget} inputs={[{ label: "起漲點", value: nLow1, onChange: setNLow1 },{ label: "波段高", value: nHigh1, onChange: setNHigh1 },{ label: "回調低", value: nLow2, onChange: setNLow2 }]} svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-blue-400 stroke-2 fill-none"><path d="M10,80 L80,20 L120,60 L190,0" /></svg>} />
-                                <PatternCard title="倒 N 字 (空)" resultLabel="滿足點" resultValue={rnTarget} inputs={[{ label: "起跌點", value: rnHigh1, onChange: setRnHigh1 },{ label: "波段低", value: rnLow1, onChange: setRnLow1 },{ label: "反彈高", value: rnHigh2, onChange: setRnHigh2 }]} svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-red-400 stroke-2 fill-none"><path d="M10,20 L80,80 L120,40 L190,100" /></svg>} />
+                                <PatternCard 
+                                    title="頭肩頂 (空)" 
+                                    inputs={[{ label: "頭部高點", value: hsHigh, onChange: setHsHigh },{ label: "頸線位置", value: hsNeck, onChange: setHsNeck }]} 
+                                    results={[
+                                        { label: "一倍滿足", value: hsTarget1, color: "blue" },
+                                        { label: "二倍滿足", value: hsTarget2, color: "purple" }
+                                    ]}
+                                    svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-red-400 stroke-2 fill-none"><path d="M10,80 L40,50 L60,80 L100,20 L140,80 L160,50 L190,80" /><line x1="10" y1="80" x2="190" y2="80" className="stroke-slate-700 stroke-1 stroke-dasharray-4" /></svg>} 
+                                />
+                                <PatternCard 
+                                    title="W 底 (多)" 
+                                    inputs={[{ label: "底部低點", value: wLow, onChange: setWLow },{ label: "頸線高點", value: wNeck, onChange: setWNeck }]} 
+                                    results={[
+                                        { label: "一倍滿足", value: wTarget1, color: "blue" },
+                                        { label: "二倍滿足", value: wTarget2, color: "purple" }
+                                    ]}
+                                    svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-green-400 stroke-2 fill-none"><path d="M10,20 L40,80 L100,40 L160,80 L190,20" /><line x1="10" y1="40" x2="190" y2="40" className="stroke-slate-700 stroke-1 stroke-dasharray-4" /></svg>} 
+                                />
+                                <PatternCard 
+                                    title="N 字 (多)" 
+                                    inputs={[{ label: "起漲點", value: nLow1, onChange: setNLow1 },{ label: "波段高", value: nHigh1, onChange: setNHigh1 },{ label: "回調低", value: nLow2, onChange: setNLow2 }]} 
+                                    results={[
+                                        { label: "一倍滿足", value: nTarget1, color: "blue" },
+                                        { label: "二倍滿足", value: nTarget2, color: "purple" }
+                                    ]}
+                                    svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-blue-400 stroke-2 fill-none"><path d="M10,80 L80,20 L120,60 L190,0" /></svg>} 
+                                />
+                                <PatternCard 
+                                    title="倒 N 字 (空)" 
+                                    inputs={[{ label: "起跌點", value: rnHigh1, onChange: setRnHigh1 },{ label: "波段低", value: rnLow1, onChange: setRnLow1 },{ label: "反彈高", value: rnHigh2, onChange: setRnHigh2 }]} 
+                                    results={[
+                                        { label: "一倍滿足", value: rnTarget1, color: "blue" },
+                                        { label: "二倍滿足", value: rnTarget2, color: "purple" }
+                                    ]}
+                                    svgContent={<svg viewBox="0 0 200 100" className="w-full h-full stroke-red-400 stroke-2 fill-none"><path d="M10,20 L80,80 L120,40 L190,100" /></svg>} 
+                                />
                                 
                                 <FibCard 
                                     title="回檔計算 (找支撐)" 
