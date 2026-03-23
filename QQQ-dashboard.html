@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QQQ 那斯達克100 ETF · 多週期看板</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0c0f;
+      --surface: #111318;
+      --border: #1e2229;
+      --border-accent: #2a3040;
+      --text-primary: #e8eaf0;
+      --text-secondary: #7a8494;
+      --text-muted: #3d4555;
+      --accent-green: #00d68f;
+      --accent-red: #ff4d6a;
+      --accent-blue: #4d9fff;
+      --accent-amber: #ffb547;
+      --font-mono: 'IBM Plex Mono', monospace;
+      --font-sans: 'IBM Plex Sans', sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      overflow: hidden;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-rows: 52px 1fr;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: relative;
+      z-index: 10;
+    }
+
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-blue) 30%, var(--accent-green) 70%, transparent);
+      opacity: 0.4;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .ticker {
+      font-family: var(--font-mono);
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-primary);
+      letter-spacing: 0.08em;
+    }
+
+    .ticker-name {
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 300;
+      color: var(--text-secondary);
+      letter-spacing: 0.04em;
+    }
+
+    .divider {
+      width: 1px;
+      height: 24px;
+      background: var(--border-accent);
+    }
+
+    .market-info {
+      display: flex;
+      gap: 20px;
+    }
+
+    .info-item {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .info-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .info-value {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .info-value.green { color: var(--accent-green); }
+    .info-value.red   { color: var(--accent-red); }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      color: var(--accent-green);
+    }
+
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      animation: blink 1.4s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--accent-green); }
+      50%       { opacity: 0.2; box-shadow: none; }
+    }
+
+    .time-display {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-secondary);
+      letter-spacing: 0.06em;
+      min-width: 80px;
+      text-align: right;
+    }
+
+    /* ── CHARTS GRID ── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      overflow: hidden;
+    }
+
+    .chart-cell {
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .chart-cell::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .chart-cell:hover::before { opacity: 1; }
+
+    .chart-cell:nth-child(1)::before { background: var(--accent-blue); }
+    .chart-cell:nth-child(2)::before { background: var(--accent-green); }
+    .chart-cell:nth-child(3)::before { background: var(--accent-amber); }
+    .chart-cell:nth-child(4)::before { background: #b47fff; }
+
+    .chart-bar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+    }
+    .chart-cell:nth-child(1) .chart-bar { background: var(--accent-blue); }
+    .chart-cell:nth-child(2) .chart-bar { background: var(--accent-green); }
+    .chart-cell:nth-child(3) .chart-bar { background: var(--accent-amber); }
+    .chart-cell:nth-child(4) .chart-bar { background: #b47fff; }
+
+    .chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px 7px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      background: var(--surface);
+    }
+
+    .tf-info {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .tf-label {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+    }
+
+    .chart-cell:nth-child(1) .tf-label { color: var(--accent-blue); }
+    .chart-cell:nth-child(2) .tf-label { color: var(--accent-green); }
+    .chart-cell:nth-child(3) .tf-label { color: var(--accent-amber); }
+    .chart-cell:nth-child(4) .tf-label { color: #b47fff; }
+
+    .tf-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 300;
+      letter-spacing: 0.02em;
+    }
+
+    .tf-strategy {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      border: 1px solid var(--border-accent);
+      padding: 2px 7px;
+      border-radius: 2px;
+    }
+
+    .chart-body {
+      flex: 1;
+      position: relative;
+      min-height: 0;
+    }
+
+    .tradingview-widget-container {
+      position: absolute !important;
+      top: 0; left: 0;
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .tradingview-widget-container__widget {
+      width: 100% !important;
+      height: 100% !important;
+    }
+  </style>
+</head>
+<body>
+
+<div class="dashboard">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-left">
+      <div>
+        <div class="ticker">QQQ</div>
+        <div class="ticker-name">Invesco QQQ Trust · Nasdaq-100 ETF</div>
+      </div>
+      <div class="divider"></div>
+      <div class="market-info">
+        <div class="info-item">
+          <span class="info-label">類型</span>
+          <span class="info-value">ETF</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">追蹤指數</span>
+          <span class="info-value">Nasdaq-100</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">數據</span>
+          <span class="info-value">免費即時</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">時區</span>
+          <span class="info-value">台北 UTC+8</span>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="live-indicator">
+        <span class="live-dot"></span>
+        LIVE
+      </div>
+      <div class="time-display" id="clock">--:--:--</div>
+    </div>
+  </header>
+
+  <!-- CHARTS GRID -->
+  <div class="charts-grid">
+
+    <!-- 1 分鐘 -->
+    <div class="chart-cell">
+      <div class="chart-bar"></div>
+      <div class="chart-header">
+        <div class="tf-info">
+          <span class="tf-label">1M</span>
+          <span class="tf-desc">1 分鐘 · 超短線</span>
+        </div>
+        <span class="tf-strategy">Scalping</span>
+      </div>
+      <div class="chart-body">
+        <div class="tradingview-widget-container" id="container_1m">
+          <div class="tradingview-widget-container__widget"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5 分鐘 -->
+    <div class="chart-cell">
+      <div class="chart-bar"></div>
+      <div class="chart-header">
+        <div class="tf-info">
+          <span class="tf-label">5M</span>
+          <span class="tf-desc">5 分鐘 · 日內波段</span>
+        </div>
+        <span class="tf-strategy">Day Trade</span>
+      </div>
+      <div class="chart-body">
+        <div class="tradingview-widget-container" id="container_5m">
+          <div class="tradingview-widget-container__widget"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 30 分鐘 -->
+    <div class="chart-cell">
+      <div class="chart-bar"></div>
+      <div class="chart-header">
+        <div class="tf-info">
+          <span class="tf-label">30M</span>
+          <span class="tf-desc">30 分鐘 · 半日趨勢</span>
+        </div>
+        <span class="tf-strategy">Swing</span>
+      </div>
+      <div class="chart-body">
+        <div class="tradingview-widget-container" id="container_30m">
+          <div class="tradingview-widget-container__widget"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 60 分鐘 -->
+    <div class="chart-cell">
+      <div class="chart-bar"></div>
+      <div class="chart-header">
+        <div class="tf-info">
+          <span class="tf-label">60M</span>
+          <span class="tf-desc">60 分鐘 · 多空方向</span>
+        </div>
+        <span class="tf-strategy">Position</span>
+      </div>
+      <div class="chart-body">
+        <div class="tradingview-widget-container" id="container_60m">
+          <div class="tradingview-widget-container__widget"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TradingView Advanced Chart Widget Script -->
+<script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+<script type="text/javascript">
+  // Common widget config
+  const SYMBOL = "NASDAQ:QQQ";
+  const TIMEZONE = "Asia/Taipei";
+  const LOCALE = "zh_TW";
+
+  const commonConfig = {
+    symbol: SYMBOL,
+    autosize: true,
+    hide_side_toolbar: false,
+    allow_symbol_change: false,
+    timezone: TIMEZONE,
+    locale: LOCALE,
+    toolbar_bg: "#111318",
+    enable_publishing: false,
+    withdateranges: false,
+    hide_volume: false,
+    style: "1",
+    theme: "dark",
+    save_image: false,
+    studies: ["Volume@tv-basicstudies"],
+    overrides: {
+      "mainSeriesProperties.candleStyle.upColor": "#00d68f",
+      "mainSeriesProperties.candleStyle.downColor": "#ff4d6a",
+      "mainSeriesProperties.candleStyle.borderUpColor": "#00d68f",
+      "mainSeriesProperties.candleStyle.borderDownColor": "#ff4d6a",
+      "mainSeriesProperties.candleStyle.wickUpColor": "#00d68f",
+      "mainSeriesProperties.candleStyle.wickDownColor": "#ff4d6a",
+      "paneProperties.background": "#0a0c0f",
+      "paneProperties.vertGridProperties.color": "#1e2229",
+      "paneProperties.horzGridProperties.color": "#1e2229",
+      "scalesProperties.textColor": "#7a8494",
+    }
+  };
+
+  // Init each chart
+  const charts = [
+    { containerId: "container_1m", interval: "1" },
+    { containerId: "container_5m", interval: "5" },
+    { containerId: "container_30m", interval: "30" },
+    { containerId: "container_60m", interval: "60" },
+  ];
+
+  charts.forEach(({ containerId, interval }) => {
+    new TradingView.widget({
+      ...commonConfig,
+      interval,
+      container_id: containerId,
+    });
+  });
+
+  // Live clock (Taipei time)
+  function updateClock() {
+    const now = new Date();
+    const opts = { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+    document.getElementById('clock').textContent = now.toLocaleTimeString('zh-TW', opts);
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+</script>
+
+</body>
+</html>
