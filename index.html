@@ -15,12 +15,13 @@
     <!-- 3. 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- 4. 引入 Firebase SDK (雲端同步核心) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, query } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+    <!-- 4. 同步引入 Firebase Compat SDK (完美解決 Babel 載入順序衝突問題) -->
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
 
+    <!-- 5. 初始化 Firebase 並定義全域 FB_METHODS -->
+    <script>
         // --- 您的 Firebase Config ---
         const firebaseConfig = {
             apiKey: "AIzaSyAtcxHLphNwIWxcQ_7EP-wxJDmk1pVgMYI",
@@ -32,17 +33,62 @@
             measurementId: "G-F1ZEBQMFG4"
         };
 
-        // 初始化 Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        // 初始化 Firebase (Compat)
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
         const appId = "trading-v4-app"; // 資料庫路徑 ID
 
-        // 將 Firebase 方法掛載到 window 供 React 使用
+        // 將 Firebase 實例與現代化語法橋接器掛載到 window 供 React 使用
         window.FB_DB = db;
         window.FB_AUTH = auth;
         window.FB_APP_ID = appId;
-        window.FB_METHODS = { collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, query, signInAnonymously, onAuthStateChanged };
+        window.FB_METHODS = {
+            // 解析巢狀集合路徑 (artifacts -> appId -> public -> data -> journal)
+            collection: (dbRef, ...paths) => {
+                let ref = dbRef;
+                for (let i = 0; i < paths.length; i++) {
+                    if (i % 2 === 0) {
+                        ref = ref.collection(paths[i]);
+                    } else {
+                        ref = ref.doc(paths[i]);
+                    }
+                }
+                return ref;
+            },
+            doc: (dbRef, ...paths) => {
+                let ref = dbRef;
+                for (let i = 0; i < paths.length; i++) {
+                    if (i % 2 === 0) {
+                        ref = ref.collection(paths[i]);
+                    } else {
+                        ref = ref.doc(paths[i]);
+                    }
+                }
+                return ref;
+            },
+            onSnapshot: (queryRef, successCallback, errorCallback) => {
+                return queryRef.onSnapshot(successCallback, errorCallback);
+            },
+            addDoc: (collectionRef, data) => {
+                return collectionRef.add(data);
+            },
+            updateDoc: (docRef, data) => {
+                return docRef.update(data);
+            },
+            deleteDoc: (docRef) => {
+                return docRef.delete();
+            },
+            query: (collectionRef) => {
+                return collectionRef; // 前端記憶體內自主排序，直接回傳
+            },
+            signInAnonymously: (authRef) => {
+                return authRef.signInAnonymously();
+            },
+            onAuthStateChanged: (authRef, callback) => {
+                return authRef.onAuthStateChanged(callback);
+            }
+        };
     </script>
 
     <style>
@@ -581,7 +627,7 @@
                 });
                 months.forEach(m => {
                     const stat = monthlyStats[m]; const netPnL = stat.netProfitTWD - stat.costAmt;
-                    if (stat.costCount < 5 && netPnL >= 180000) bonusAccumulated += 20000;
+                    if (stat.costCount > 0 && stat.costCount < 5 && netPnL >= 180000) bonusAccumulated += 20000;
                 });
                 return { goalData: data, pigBonus: bonusAccumulated };
             }, [records, currentYear]);
