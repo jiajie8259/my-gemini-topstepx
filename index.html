@@ -5,24 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TopstepX 當沖交易戰情室</title>
     
-    <!-- 1. 引入 React 和 ReactDOM -->
+    <!-- 1. 引入 React 和 ReactDOM (不使用 module 導入，確保同步加載) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
-    <!-- 2. 引入 Babel -->
+    <!-- 2. 引入 Babel Standalone 進行即時編譯 -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- 3. 引入 Tailwind CSS -->
+    <!-- 3. 引入 Tailwind CSS 進行流暢排版 -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- 4. 同步引入 Firebase Compat SDK (完美解決 Babel 載入順序衝突問題) -->
+    <!-- 4. 同步引入 Firebase v10 Compat SDK (徹底避開 import 語法衝突) -->
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
 
-    <!-- 5. 初始化 Firebase 並定義全域 FB_METHODS -->
+    <!-- 5. 全域初始化 Firebase 與 Bridge 橋接器 -->
     <script>
-        // --- 您的 Firebase Config ---
         const firebaseConfig = {
             apiKey: "AIzaSyAtcxHLphNwIWxcQ_7EP-wxJDmk1pVgMYI",
             authDomain: "trading-station-7cdbd.firebaseapp.com",
@@ -37,14 +36,13 @@
         const app = firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
-        const appId = "trading-v4-app"; // 資料庫路徑 ID
+        const appId = "trading-v4-app"; 
 
-        // 將 Firebase 實例與現代化語法橋接器掛載到 window 供 React 使用
+        // 橋接全域變數與資料庫語法供 React 內部直接存取
         window.FB_DB = db;
         window.FB_AUTH = auth;
         window.FB_APP_ID = appId;
         window.FB_METHODS = {
-            // 解析巢狀集合路徑 (artifacts -> appId -> public -> data -> journal)
             collection: (dbRef, ...paths) => {
                 let ref = dbRef;
                 for (let i = 0; i < paths.length; i++) {
@@ -80,7 +78,7 @@
                 return docRef.delete();
             },
             query: (collectionRef) => {
-                return collectionRef; // 前端記憶體內自主排序，直接回傳
+                return collectionRef;
             },
             signInAnonymously: (authRef) => {
                 return authRef.signInAnonymously();
@@ -110,7 +108,6 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // --- 圖標組件 ---
         const IconWrapper = ({ children, color = "currentColor", size = 24, className = "" }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
         );
@@ -135,7 +132,6 @@
         const formatUSD = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val || 0);
         const formatNumber = (val) => { if (val === null || val === '' || isNaN(val)) return '--'; const num = parseFloat(val); return Number.isInteger(num) ? num.toString() : num.toFixed(2); };
 
-        // --- 技術分析圖形卡片 (支援雙倍幅顯示) ---
         const PatternCard = ({ title, svgContent, inputs, results }) => (
             <div className="bg-slate-800 rounded-lg border border-slate-700 p-3 shadow-lg flex flex-col h-full">
                 <div className="flex flex-col items-center justify-center bg-slate-900 rounded p-2 border border-slate-800 mb-3">
@@ -193,7 +189,6 @@
             </div>
         );
 
-        // --- 加減碼模組 ---
         const PositionManager = () => {
             const [currentLots, setCurrentLots] = useState('');
             const [currentCost, setCurrentCost] = useState('');
@@ -251,7 +246,6 @@
             );
         };
 
-        // --- MNQ 計算器 ---
         const MNQCalculator = () => {
             const [contracts, setContracts] = useState('');
             const [costPrice, setCostPrice] = useState('');
@@ -302,7 +296,6 @@
             );
         };
 
-        // --- 核心邏輯：InvestmentJournal ---
         const InvestmentJournal = () => {
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [password, setPassword] = useState('');
@@ -372,7 +365,7 @@
                             <button type="submit" className="bg-blue-600 px-4 py-2 rounded text-white"><ArrowRight size={20} /></button>
                         </form>
                         <p className="mt-4 text-[10px] text-slate-500">
-                            {authError ? <span className="text-red-500">連線錯誤: {authError} (請檢查 Firebase Authentication 設定)</span> : 
+                            {authError ? <span className="text-red-500">連線錯誤: {authError}</span> : 
                              user ? '● 雲端連線已就緒' : '○ 正在連接資料庫...'}
                         </p>
                     </div>
@@ -672,7 +665,6 @@
             );
         };
 
-        // --- 主程式：TradingAssistant ---
         const TradingAssistant = () => {
             const [activeTab, setActiveTab] = useState('tech');
 
@@ -701,7 +693,7 @@
             const rnTarget1 = (rnDist && rnHigh2) ? parseFloat(rnHigh2) - rnDist : null;
             const rnTarget2 = (rnDist && rnHigh2) ? parseFloat(rnHigh2) - (2 * rnDist) : null;
 
-            // --- 回檔狀態 (保持原樣) ---
+            // --- 回檔狀態 ---
             const [fbL, setFbL] = useState(''); const [fbH, setFbH] = useState('');
             const bR = (fbH && fbL) ? parseFloat(fbH) - parseFloat(fbL) : 0;
             const bLevels = bR > 0 ? [
@@ -710,7 +702,7 @@
                 { label: '0.618 強勢回檔 (支撐弱)', value: parseFloat(fbH) - (bR * 0.618), highlight: true }
             ] : [{ label: '0.382', value: null }, { label: '0.500', value: null }, { label: '0.618', value: null }];
 
-            // --- 反彈狀態 (保持原樣) ---
+            // --- 反彈狀態 ---
             const [frH, setFrH] = useState(''); const [frL, setFrL] = useState('');
             const rR = (frH && frL) ? parseFloat(frH) - parseFloat(frL) : 0;
             const rLevels = rR > 0 ? [
