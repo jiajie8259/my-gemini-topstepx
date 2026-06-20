@@ -8,7 +8,9 @@
     <!-- 引入 React 和 ReactDOM (傳統同步加載) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- 鎖定 Babel Standalone 版本為 7.23.6，徹底避開動態 import 導致的 Sandbox 報錯 -->
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- 同步引入 Firebase v10 Compat SDK (徹底避開 import 語法衝突) -->
@@ -28,10 +30,33 @@
             measurementId: "G-F1ZEBQMFG4"
         };
 
+        // 初始化 Firebase (Compat)
         const app = firebase.initializeApp(firebaseConfig);
-        window.fbDb = firebase.firestore();
-        window.fbAuth = firebase.auth();
-        window.appId = "trading-v4-app"; 
+        
+        // 修正變數大小寫：確保與 React 內部呼叫完全一致
+        window.FB_DB = firebase.firestore();
+        window.FB_AUTH = firebase.auth();
+        window.FB_APP_ID = "trading-v4-app"; 
+
+        window.FB_METHODS = {
+            collection: (dbRef, ...paths) => {
+                let ref = dbRef;
+                for (let i = 0; i < paths.length; i++) {
+                    if (i % 2 === 0) ref = ref.collection(paths[i]);
+                    else ref = ref.doc(paths[i]);
+                }
+                return ref;
+            },
+            // 修正 doc 方法，確保 updateDoc 與 deleteDoc 能正確指向文檔
+            doc: (colRef, id) => colRef.doc(id),
+            onSnapshot: (queryRef, successCallback, errorCallback) => queryRef.onSnapshot(successCallback, errorCallback),
+            addDoc: (collectionRef, data) => collectionRef.add(data),
+            updateDoc: (docRef, data) => docRef.update(data),
+            deleteDoc: (docRef) => docRef.delete(),
+            query: (collectionRef) => collectionRef,
+            signInAnonymously: (authRef) => authRef.signInAnonymously(),
+            onAuthStateChanged: (authRef, callback) => authRef.onAuthStateChanged(callback)
+        };
     </script>
 
     <style>
@@ -49,7 +74,7 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // --- 共用 Icons (深度壓縮以防截斷) ---
+        // --- 共用 Icons ---
         const Ic = ({d, c="currentColor", sz=24, cls=""}) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cls}><path d={d}/></svg>;
         const Icons = {
             Chart: (p) => <Ic d="M22 12h-4l-3 9L9 3l-3 9H2" {...p}/>,
