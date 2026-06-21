@@ -108,11 +108,11 @@
             </div>
         );
 
-        const PatternCard = ({ title, svg, inputs, results, isGrid=true }) => (
+        const PatternCard = ({ title, svgContent, inputs, results, isGrid=true }) => (
             <div className="bg-slate-800 rounded-lg border border-slate-700 p-3 shadow-lg flex flex-col h-full">
                 <div className="flex flex-col items-center justify-center bg-slate-900 rounded p-2 border border-slate-800 mb-3">
                     <h3 className="text-sm font-bold text-slate-200 mb-1">{title}</h3>
-                    <div className="w-full h-20 flex items-center justify-center">{svg}</div>
+                    <div className="w-full h-20 flex items-center justify-center">{svgContent}</div>
                 </div>
                 <div className="flex-1 flex flex-col justify-between space-y-2">
                     <div className="space-y-2">{inputs.map((inp, i) => <Inp key={i} lbl={inp.l} val={inp.v} set={inp.s} />)}</div>
